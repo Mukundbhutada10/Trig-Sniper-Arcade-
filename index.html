@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trig Sniper Arcade</title>
+    <!-- Tailwind CSS for responsive layout & UI polish -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Orbitron for arcade feel & Inter for clean readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+    <!-- Tone.js for crisp arcade laser & explosion sound effects (no external URLs) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* Custom Arcade Styling & Animations */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #070b19;
+            color: #f8fafc;
+            overflow: hidden; /* Prevent scrolling during mobile gameplay */
+            margin: 0;
+            padding: 0;
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .font-arcade {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Glowing neon effects */
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(34, 211, 238, 0.7), 0 0 20px rgba(34, 211, 238, 0.4);
+        }
+
+        .neon-text-pink {
+            text-shadow: 0 0 10px rgba(244, 63, 94, 0.7), 0 0 20px rgba(244, 63, 94, 0.4);
+        }
+
+        /* Arcade 3D-style Tactile Buttons */
+        .trig-btn {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid #334155;
+            box-shadow: 0 4px 0 #020617, 0 0 12px rgba(56, 189, 248, 0.15);
+            transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .trig-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #020617;
+        }
+
+        .trig-btn-primary {
+            border-color: #0284c7;
+        }
+        .trig-btn-primary:hover, .trig-btn-primary:active {
+            border-color: #38bdf8;
+            background: linear-gradient(180deg, #0369a1 0%, #0c4a6e 100%);
+        }
+
+        .trig-btn-reciprocal {
+            border-color: #9333ea;
+        }
+        .trig-btn-reciprocal:hover, .trig-btn-reciprocal:active {
+            border-color: #c084fc;
+            background: linear-gradient(180deg, #6b21a8 0%, #3b0764 100%);
+        }
+
+        /* Screen Shake animation on wrong shot or meteor impact */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+            animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 select-none">
+
+    <!-- TOP HUD BAR -->
+    <header class="w-full px-3 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <!-- Lives / Hull Integrity -->
+            <div id="lives-container" class="flex items-center gap-1 text-rose-500 text-lg sm:text-xl" title="Hull Integrity">
+                <!-- Hearts injected via JS -->
+            </div>
+            <!-- Score & Streak -->
+            <div class="flex flex-col">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Score</span>
+                <span id="score-display" class="font-arcade text-base sm:text-lg font-bold text-cyan-400 leading-none">0</span>
+            </div>
+            <div class="flex flex-col border-l border-slate-700 pl-3">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Streak</span>
+                <span id="streak-display" class="font-arcade text-base sm:text-lg font-bold text-amber-400 leading-none">0x</span>
+            </div>
+        </div>
+
+        <!-- Utility Buttons: Reference Cheat Sheet, Sound Toggle, Pause -->
+        <div class="flex items-center gap-2">
+            <button id="btn-cheat-sheet" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-cyan-300 flex items-center gap-1 shadow-sm active:scale-95 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                <span>Formulas</span>
+            </button>
+            <button id="btn-sound" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 active:scale-95 transition" aria-label="Toggle Sound">
+                <svg id="icon-sound-on" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                <svg id="icon-sound-off" class="w-4 h-4 text-slate-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAMEPLAY CANVAS AREA -->
+    <main id="canvas-wrapper" class="relative flex-1 w-full overflow-hidden bg-slate-950">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Dynamic Feedback Toast Banner (Non-intrusive educational hint) -->
+        <div id="feedback-banner" class="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-xs sm:text-sm font-semibold text-center opacity-0 transition-opacity duration-200 shadow-lg whitespace-nowrap z-10">
+            <!-- Dynamic text -->
+        </div>
+
+        <!-- START / MODE SELECTION OVERLAY -->
+        <div id="start-modal" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 z-20">
+            <div class="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl p-5 sm:p-6 shadow-2xl text-center">
+                <div class="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-wider uppercase mb-2">
+                    Trigonometry Trainer
+                </div>
+                <h1 class="font-arcade text-2xl sm:text-3xl font-black text-white neon-text-cyan mb-2">
+                    TRIG SNIPER
+                </h1>
+                <p class="text-slate-300 text-xs sm:text-sm mb-5 leading-relaxed">
+                    Meteors are falling with fractions of <span class="text-rose-400 font-semibold">Opposite</span>, <span class="text-emerald-400 font-semibold">Adjacent</span>, and <span class="text-amber-400 font-semibold">Hypotenuse</span>. Tap the matching trigonometric ratio button to blast them!
+                </p>
+
+                <!-- Learning Mode Selector -->
+                <div class="text-left mb-5 space-y-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Select Training Mode:</label>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button data-mode="all" class="mode-select-btn active-mode flex items-center justify-between p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/40 text-left transition">
+                            <div>
+                                <div class="font-bold text-sm text-white">All 6 Ratios (Recommended)</div>
+                                <div class="text-xs text-slate-300">sin, cos, tan + csc, sec, cot</div>
+                            </div>
+                            <span class="text-xs font-arcade px-2 py-0.5 rounded bg-cyan-500 text-slate-950 font-bold">FULL</span>
+                        </button>
+                        <button data-mode="primary" class="mode-select-btn flex items-center justify-between p-3 rounded-xl border border-slate-700 bg-slate-800/60 hover:border-slate-500 text-left transition">
+                            <div>
+                                <div class="font-bold text-sm text-white">Step 1: Primary 3 Only</div>
+                                <div class="text-xs text-slate-400">Master sin, cos, and tan first</div>
+                            </div>
+                            <span class="text-xs font-arcade px-2 py-0.5 rounded bg-slate-700 text-slate-300">EASY</span>
+                        </button>
+                        <button data-mode="reciprocal" class="mode-select-btn flex items-center justify-between p-3 rounded-xl border border-slate-700 bg-slate-800/60 hover:border-slate-500 text-left transition">
+                            <div>
+                                <div class="font-bold text-sm text-white">Step 2: Reciprocal 3 Only</div>
+                                <div class="text-xs text-slate-400">Drill csc, sec, and cot</div>
+                            </div>
+                            <span class="text-xs font-arcade px-2 py-0.5 rounded bg-purple-900/60 text-purple-300">DRILL</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reference Triangle Preview -->
+                <div class="bg-slate-950/70 rounded-xl p-3 mb-5 border border-slate-800 flex items-center justify-around text-xs">
+                    <svg width="95" height="65" viewBox="0 0 110 75" class="shrink-0">
+                        <!-- Right Triangle -->
+                        <polygon points="15,60 95,60 95,15" fill="rgba(56, 189, 248, 0.1)" stroke="#38bdf8" stroke-width="2"/>
+                        <!-- Right angle square -->
+                        <polyline points="85,60 85,50 95,50" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
+                        <!-- Theta arc -->
+                        <path d="M 33,60 A 18,18 0 0,0 29,51" fill="none" stroke="#fbbf24" stroke-width="2"/>
+                        <text x="36" y="55" fill="#fbbf24" font-size="11" font-weight="bold">θ</text>
+                        <!-- Labels -->
+                        <text x="45" y="30" fill="#fbbf24" font-size="9" font-weight="bold" transform="rotate(-29 45,30)">Hyp</text>
+                        <text x="98" y="42" fill="#fb7185" font-size="9" font-weight="bold">Opp</text>
+                        <text x="45" y="72" fill="#34d399" font-size="9" font-weight="bold">Adj</text>
+                    </svg>
+                    <div class="text-left space-y-1 text-[11px] sm:text-xs">
+                        <div><span class="text-amber-400 font-bold">Hypotenuse:</span> Longest side (across 90°)</div>
+                        <div><span class="text-rose-400 font-bold">Opposite:</span> Side across from angle θ</div>
+                        <div><span class="text-emerald-400 font-bold">Adjacent:</span> Side next to angle θ</div>
+                    </div>
+                </div>
+
+                <button id="btn-start-game" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-arcade font-black text-base sm:text-lg tracking-wider shadow-lg shadow-cyan-500/25 active:scale-98 transition">
+                    LAUNCH TURRET
+                </button>
+            </div>
+        </div>
+
+        <!-- GAME OVER OVERLAY -->
+        <div id="gameover-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-30">
+            <div class="w-full max-w-md bg-slate-900 border border-rose-500/40 rounded-2xl p-6 shadow-2xl text-center">
+                <h2 class="font-arcade text-2xl sm:text-3xl font-black text-rose-500 neon-text-pink mb-1">
+                    SHIELDS DEPLETED
+                </h2>
+                <p class="text-slate-400 text-xs sm:text-sm mb-5">Great practice! Review your stats below and try to beat your streak.</p>
+
+                <div class="grid grid-cols-2 gap-3 mb-5">
+                    <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                        <div class="text-xs text-slate-400 uppercase">Final Score</div>
+                        <div id="final-score" class="font-arcade text-2xl font-bold text-cyan-400">0</div>
+                    </div>
+                    <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                        <div class="text-xs text-slate-400 uppercase">Best Streak</div>
+                        <div id="final-streak" class="font-arcade text-2xl font-bold text-amber-400">0x</div>
+                    </div>
+                </div>
+
+                <!-- Weakest Ratio Tip -->
+                <div id="study-tip-box" class="bg-indigo-950/50 border border-indigo-500/30 rounded-xl p-3 mb-5 text-left">
+                    <div class="text-xs font-bold text-indigo-300 uppercase mb-1">💡 Study Tip for Next Round:</div>
+                    <div id="study-tip-text" class="text-xs sm:text-sm text-slate-200">
+                        Keep practicing all six ratios to build automatic recall!
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btn-change-mode" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-sm transition">
+                        Change Mode
+                    </button>
+                    <button id="btn-restart" class="flex-2 w-2/3 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-arcade font-black text-sm sm:text-base tracking-wide shadow-lg shadow-cyan-500/20 active:scale-95 transition">
+                        PLAY AGAIN
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHEAT SHEET / FORMULA MODAL (Pauses Game Automatically) -->
+        <div id="cheat-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-40">
+            <div class="w-full max-w-md bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                    <div>
+                        <h3 class="font-arcade text-lg font-bold text-cyan-400">TRIG RATIO REFERENCE</h3>
+                        <p class="text-xs text-slate-400">Game paused while studying</p>
+                    </div>
+                    <button id="btn-close-cheat" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-xs sm:text-sm mb-4">
+                    <!-- Primary Ratios -->
+                    <div class="space-y-2">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-sky-400">Primary Ratios</div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">sin θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-rose-400">Opp</span> / <span class="text-amber-400">Hyp</span></span>
+                        </div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">cos θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-emerald-400">Adj</span> / <span class="text-amber-400">Hyp</span></span>
+                        </div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">tan θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-rose-400">Opp</span> / <span class="text-emerald-400">Adj</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Reciprocal Ratios -->
+                    <div class="space-y-2">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-purple-400">Reciprocals (Flipped)</div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">csc θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-amber-400">Hyp</span> / <span class="text-rose-400">Opp</span></span>
+                        </div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">sec θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-amber-400">Hyp</span> / <span class="text-emerald-400">Adj</span></span>
+                        </div>
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                            <span class="font-arcade font-bold text-white">cot θ</span>
+                            <span class="text-slate-300 font-semibold"><span class="text-emerald-400">Adj</span> / <span class="text-rose-400">Opp</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/60 p-3 rounded-xl text-xs text-slate-300 mb-4">
+                    <strong class="text-amber-400">Memory Trick:</strong> Notice how each pair flips! <br>
+                    • <b>sin</b> ↔ <b>csc</b> (S pairs with C)<br>
+                    • <b>cos</b> ↔ <b>sec</b> (C pairs with S)<br>
+                    • <b>tan</b> ↔ <b>cot</b> (Both have "tan")
+                </div>
+
+                <button id="btn-resume-cheat" class="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-arcade font-bold text-sm transition">
+                    RESUME GAME
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- MOBILE-OPTIMIZED 6-BUTTON LASER CONTROL DECK -->
+    <footer class="w-full bg-slate-900 border-t border-slate-800 p-2 sm:p-3 z-10 shrink-0">
+        <div class="max-w-xl mx-auto">
+            <!-- Row 1: Primary Ratios -->
+            <div class="grid grid-cols-3 gap-2 mb-2">
+                <button data-ratio="sin" class="trig-btn trig-btn-primary rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-sky-300 leading-tight">sin θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Sine</span>
+                </button>
+                <button data-ratio="cos" class="trig-btn trig-btn-primary rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-sky-300 leading-tight">cos θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Cosine</span>
+                </button>
+                <button data-ratio="tan" class="trig-btn trig-btn-primary rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-sky-300 leading-tight">tan θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Tangent</span>
+                </button>
+            </div>
+            <!-- Row 2: Reciprocal Ratios -->
+            <div class="grid grid-cols-3 gap-2">
+                <button data-ratio="csc" class="trig-btn trig-btn-reciprocal rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-purple-300 leading-tight">csc θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Cosecant</span>
+                </button>
+                <button data-ratio="sec" class="trig-btn trig-btn-reciprocal rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-purple-300 leading-tight">sec θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Secant</span>
+                </button>
+                <button data-ratio="cot" class="trig-btn trig-btn-reciprocal rounded-xl py-2.5 sm:py-3 px-2 flex flex-col items-center justify-center">
+                    <span class="font-arcade text-base sm:text-lg font-extrabold text-purple-300 leading-tight">cot θ</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Cotangent</span>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * TRIG SNIPER ARCADE - Core Game Engine & Trigonometry Definitions
+         * Designed for mobile touch responsiveness and active recall of all 6 ratios.
+         */
+
+        // 1. Complete Dictionary of the 6 Trigonometric Ratios using Opposite, Adjacent, Hypotenuse
+        const TRIG_RATIOS = [
+            {
+                id: 'sin',
+                name: 'Sine',
+                symbol: 'sin θ',
+                num: 'Opposite',
+                den: 'Hypotenuse',
+                shortNum: 'Opp',
+                shortDen: 'Hyp',
+                category: 'primary',
+                color: '#38bdf8'
+            },
+            {
+                id: 'cos',
+                name: 'Cosine',
+                symbol: 'cos θ',
+                num: 'Adjacent',
+                den: 'Hypotenuse',
+                shortNum: 'Adj',
+                shortDen: 'Hyp',
+                category: 'primary',
+                color: '#38bdf8'
+            },
+            {
+                id: 'tan',
+                name: 'Tangent',
+                symbol: 'tan θ',
+                num: 'Opposite',
+                den: 'Adjacent',
+                shortNum: 'Opp',
+                shortDen: 'Adj',
+                category: 'primary',
+                color: '#38bdf8'
+            },
+            {
+                id: 'csc',
+                name: 'Cosecant',
+                symbol: 'csc θ',
+                num: 'Hypotenuse',
+                den: 'Opposite',
+                shortNum: 'Hyp',
+                shortDen: 'Opp',
+                category: 'reciprocal',
+                color: '#c084fc'
+            },
+            {
+                id: 'sec',
+                name: 'Secant',
+                symbol: 'sec θ',
+                num: 'Hypotenuse',
+                den: 'Adjacent',
+                shortNum: 'Hyp',
+                shortDen: 'Adj',
+                category: 'reciprocal',
+                color: '#c084fc'
+            },
+            {
+                id: 'cot',
+                name: 'Cotangent',
+                symbol: 'cot θ',
+                num: 'Adjacent',
+                den: 'Opposite',
+                shortNum: 'Adj',
+                shortDen: 'Opp',
+                category: 'reciprocal',
+                color: '#c084fc'
+            }
+        ];
+
+        // 2. Game State & DOM References
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+
+        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'GAMEOVER'
+        let selectedMode = 'all'; // 'all', 'primary', 'reciprocal'
+        let score = 0;
+        let streak = 0;
+        let bestStreak = 0;
+        let lives = 5;
+        const MAX_LIVES = 5;
+
+        // Track mistakes per ratio to give personalized study tips at Game Over
+        let mistakeTracker = { sin: 0, cos: 0, tan: 0, csc: 0, sec: 0, cot: 0 };
+
+        // Entities on screen
+        let meteors = [];
+        let lasers = [];
+        let particles = [];
+        let floatingTexts = [];
+        let stars = [];
+
+        // Turret state
+        const turret = {
+            x: 0,
+            y: 0,
+            angle: -Math.PI / 2,
+            recoil: 0
+        };
+
+        // Timing & Difficulty Scaling
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 2800; // ms between meteors initially
+        let baseSpeed = 48; // pixels per second initially
+        let animationFrameId = null;
+
+        // 3. Sound Effects via Tone.js (Synthesized, zero external audio assets)
+        let soundEnabled = true;
+        let synthLaser = null;
+        let synthExplosion = null;
+        let synthError = null;
+
+        function initAudio() {
+            if (synthLaser) return;
+            try {
+                Tone.start();
+                synthLaser = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synthLaser.volume.value = -10;
+
+                synthExplosion = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
+                }).toDestination();
+                synthExplosion.volume.value = -8;
+
+                synthError = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synthError.volume.value = -10;
+            } catch (e) {
+                console.warn('Audio initialization deferred:', e);
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            try {
+                if (type === 'laser' && synthLaser) {
+                    synthLaser.triggerAttackRelease('C6', '16n');
+                } else if (type === 'explosion' && synthExplosion) {
+                    synthExplosion.triggerAttackRelease('8n');
+                } else if (type === 'error' && synthError) {
+                    synthError.triggerAttackRelease('A2', '8n');
+                }
+            } catch (e) {
+                // Ignore rapid trigger overlapping errors
+            }
+        }
+
+        // 4. Responsive Canvas Resizing
+        function resizeCanvas() {
+            const rect = wrapper.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // Reposition turret at bottom center
+            turret.x = rect.width / 2;
+            turret.y = rect.height - 28;
+
+            // Regenerate background starfield to fit new dimensions
+            generateStars(rect.width, rect.height);
+        }
+
+        function generateStars(w, h) {
+            stars = [];
+            const count = Math.floor((w * h) / 6000);
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    size: Math.random() * 1.8 + 0.5,
+                    alpha: Math.random() * 0.7 + 0.2,
+                    speed: Math.random() * 8 + 2
+                });
+            }
+        }
+
+        // 5. UI Updates & Feedback Helpers
+        function updateHUD() {
+            document.getElementById('score-display').textContent = score;
+            document.getElementById('streak-display').textContent = `${streak}x`;
+
+            const livesContainer = document.getElementById('lives-container');
+            livesContainer.innerHTML = '';
+            for (let i = 0; i < MAX_LIVES; i++) {
+                const heart = document.createElement('span');
+                heart.textContent = i < lives ? '♥' : '♡';
+                heart.className = i < lives ? 'text-rose-500 drop-shadow-[0_0_6px_rgba(244,63,94,0.7)]' : 'text-slate-700';
+                livesContainer.appendChild(heart);
+            }
+        }
+
+        let feedbackTimeout = null;
+        function showFeedback(text, isGood) {
+            const banner = document.getElementById('feedback-banner');
+            banner.textContent = text;
+            banner.className = `pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full border text-xs sm:text-sm font-bold text-center transition-opacity duration-200 shadow-lg whitespace-nowrap z-10 opacity-100 ${
+                isGood
+                    ? 'bg-emerald-950/90 border-emerald-500 text-emerald-300'
+                    : 'bg-rose-950/90 border-rose-500 text-rose-300'
+            }`;
+
+            clearTimeout(feedbackTimeout);
+            feedbackTimeout = setTimeout(() => {
+                banner.classList.remove('opacity-100');
+                banner.classList.add('opacity-0');
+            }, 1400);
+        }
+
+        function triggerShake() {
+            wrapper.classList.remove('animate-shake');
+            void wrapper.offsetWidth; // Force reflow
+            wrapper.classList.add('animate-shake');
+        }
+
+        // 6. Meteor Spawning & Difficulty Progression
+        function getPoolForMode() {
+            if (selectedMode === 'primary') {
+                return TRIG_RATIOS.filter(r => r.category === 'primary');
+            } else if (selectedMode === 'reciprocal') {
+                return TRIG_RATIOS.filter(r => r.category === 'reciprocal');
+            }
+            return TRIG_RATIOS;
+        }
+
+        function spawnMeteor() {
+            const rect = wrapper.getBoundingClientRect();
+            const pool = getPoolForMode();
+            const ratioObj = pool[Math.floor(Math.random() * pool.length)];
+
+            // Keep meteor comfortably inside horizontal screen bounds
+            const radius = Math.min(54, Math.max(44, rect.width * 0.11));
+            const margin = radius + 16;
+            const x = margin + Math.random() * (rect.width - margin * 2);
+
+            // Scale speed gently with score
+            const speedMultiplier = 1 + Math.min(1.5, score / 2500);
+            const vy = baseSpeed * speedMultiplier * (0.9 + Math.random() * 0.25);
+
+            // Create rugged polygon vertices for asteroid look
+            const vertices = [];
+            const numPoints = 10;
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (i / numPoints) * Math.PI * 2;
+                const variance = 0.88 + Math.random() * 0.2;
+                vertices.push({
+                    x: Math.cos(angle) * radius * variance,
+                    y: Math.sin(angle) * radius * variance
+                });
+            }
+
+            meteors.push({
+                id: Math.random(),
+                ratio: ratioObj,
+                x: x,
+                y: -radius - 10,
+                vy: vy,
+                radius: radius,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.6,
+                vertices: vertices
+            });
+        }
+
+        // 7. Firing & Matching Logic
+        function handleFireRatio(ratioId) {
+            if (gameState !== 'PLAYING') return;
+
+            // Find the lowest (most dangerous) meteor on screen
+            if (meteors.length === 0) return;
+
+            // Sort meteors by Y descending so we target the closest threat first,
+            // OR prioritize any matching meteor if multiple exist so player isn't punished for shooting a valid target!
+            const matchingMeteors = meteors
+                .filter(m => m.ratio.id === ratioId)
+                .sort((a, b) => b.y - a.y);
+
+            if (matchingMeteors.length > 0) {
+                // HIT! Destroy the lowest matching meteor
+                const target = matchingMeteors[0];
+                destroyMeteor(target);
+            } else {
+                // MISS! Player tapped the wrong ratio for the active meteors
+                const closestMeteor = [...meteors].sort((a, b) => b.y - a.y)[0];
+                handleWrongShot(ratioId, closestMeteor);
+            }
+        }
+
+        function destroyMeteor(meteor) {
+            // Aim turret at meteor
+            turret.angle = Math.atan2(meteor.y - turret.y, meteor.x - turret.x);
+            turret.recoil = 8;
+
+            // Spawn laser beam visual
+            lasers.push({
+                x1: turret.x,
+                y1: turret.y - 12,
+                x2: meteor.x,
+                y2: meteor.y,
+                color: meteor.ratio.color,
+                alpha: 1.0
+            });
+
+            // Spawn explosion particles
+            createExplosion(meteor.x, meteor.y, meteor.ratio.color);
+
+            // Remove meteor
+            meteors = meteors.filter(m => m.id !== meteor.id);
+
+            // Update Score & Streak
+            streak++;
+            if (streak > bestStreak) bestStreak = streak;
+            const pointsEarned = 100 + Math.min(streak * 15, 150);
+            score += pointsEarned;
+
+            // Floating score popup
+            floatingTexts.push({
+                x: meteor.x,
+                y: meteor.y,
+                text: `${meteor.ratio.symbol} +${pointsEarned}`,
+                color: '#34d399',
+                alpha: 1.0,
+                vy: -45
+            });
+
+            playSound('laser');
+            setTimeout(() => playSound('explosion'), 40);
+            showFeedback(`Direct Hit! ${meteor.ratio.symbol} = ${meteor.ratio.shortNum} / ${meteor.ratio.shortDen}`, true);
+            updateHUD();
+
+            // Gradually tighten spawn rate as score rises
+            spawnInterval = Math.max(1250, 2800 - Math.floor(score / 200) * 110);
+        }
+
+        function handleWrongShot(pressedRatioId, closestMeteor) {
+            playSound('error');
+            triggerShake();
+            streak = 0;
+            updateHUD();
+
+            const pressedObj = TRIG_RATIOS.find(r => r.id === pressedRatioId);
+            if (closestMeteor) {
+                mistakeTracker[closestMeteor.ratio.id]++;
+                // Aim a red fizzled laser toward the closest meteor
+                turret.angle = Math.atan2(closestMeteor.y - turret.y, closestMeteor.x - turret.x);
+                lasers.push({
+                    x1: turret.x,
+                    y1: turret.y - 12,
+                    x2: (turret.x + closestMeteor.x) / 2,
+                    y2: (turret.y + closestMeteor.y) / 2,
+                    color: '#f43f5e',
+                    alpha: 0.9
+                });
+
+                showFeedback(
+                    `Miss! ${pressedObj.symbol} is ${pressedObj.shortNum}/${pressedObj.shortDen} (Need ${closestMeteor.ratio.symbol})`,
+                    false
+                );
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 22; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 140 + 40;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 3.5 + 1.5,
+                    color: i % 2 === 0 ? color : '#fbbf24',
+                    alpha: 1.0,
+                    decay: Math.random() * 1.5 + 1.2
+                });
+            }
+        }
+
+        // 8. Main Animation & Physics Loop
+        function gameLoop(timestamp) {
+            if (gameState !== 'PLAYING') return;
+
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap dt to prevent jumps
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            const rect = wrapper.getBoundingClientRect();
+
+            // Update background stars
+            for (const s of stars) {
+                s.y += s.speed * dt;
+                if (s.y > rect.height) {
+                    s.y = 0;
+                    s.x = Math.random() * rect.width;
+                }
+            }
+
+            // Spawn timer
+            spawnTimer += dt * 1000;
+            if (spawnTimer >= spawnInterval || meteors.length === 0) {
+                spawnMeteor();
+                spawnTimer = 0;
+            }
+
+            // Turret recoil recovery
+            if (turret.recoil > 0) {
+                turret.recoil = Math.max(0, turret.recoil - 35 * dt);
+            }
+
+            // Update meteors
+            const dangerLineY = rect.height - 54;
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const m = meteors[i];
+                m.y += m.vy * dt;
+                m.rotation += m.rotSpeed * dt;
+
+                // Check if meteor hit the defense shield line
+                if (m.y + m.radius >= dangerLineY) {
+                    lives--;
+                    streak = 0;
+                    mistakeTracker[m.ratio.id]++;
+                    createExplosion(m.x, dangerLineY, '#f43f5e');
+                    playSound('error');
+                    triggerShake();
+                    showFeedback(`Impact! ${m.ratio.shortNum}/${m.ratio.shortDen} was ${m.ratio.symbol}`, false);
+                    meteors.splice(i, 1);
+                    updateHUD();
+
+                    if (lives <= 0) {
+                        endGame();
+                        return;
+                    }
+                }
+            }
+
+            // Update lasers
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                lasers[i].alpha -= 4.5 * dt;
+                if (lasers[i].alpha <= 0) lasers.splice(i, 1);
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.alpha -= p.decay * dt;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            // Update floating score texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy * dt;
+                ft.alpha -= 1.1 * dt;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            const rect = wrapper.getBoundingClientRect();
+            const w = rect.width;
+            const h = rect.height;
+
+            // Clear space background
+            ctx.fillStyle = '#070b19';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw twinkling stars
+            for (const s of stars) {
+                ctx.fillStyle = `rgba(226, 232, 240, ${s.alpha})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw Defense Shield Line at bottom
+            const shieldY = h - 54;
+            const shieldGrad = ctx.createLinearGradient(0, shieldY, w, shieldY);
+            shieldGrad.addColorStop(0, 'rgba(56, 189, 248, 0.05)');
+            shieldGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.45)');
+            shieldGrad.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
+            ctx.strokeStyle = shieldGrad;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, shieldY);
+            ctx.lineTo(w, shieldY);
+            ctx.stroke();
+
+            // Draw Laser Beams
+            for (const l of lasers) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, l.alpha);
+                ctx.strokeStyle = l.color;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = l.color;
+                ctx.beginPath();
+                ctx.moveTo(l.x1, l.y1);
+                ctx.lineTo(l.x2, l.y2);
+                ctx.stroke();
+
+                // Bright white core
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw Falling Ratio Meteors
+            for (const m of meteors) {
+                ctx.save();
+                ctx.translate(m.x, m.y);
+
+                // Rotating rocky asteroid body
+                ctx.save();
+                ctx.rotate(m.rotation);
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = m.ratio.color;
+                ctx.lineWidth = 2.5;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = m.ratio.color;
+
+                ctx.beginPath();
+                m.vertices.forEach((v, idx) => {
+                    if (idx === 0) ctx.moveTo(v.x, v.y);
+                    else ctx.lineTo(v.x, v.y);
+                });
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                // Upright, high-contrast Fraction Badge inside Meteor so text never rotates upside down
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Numerator text
+                ctx.font = '700 13px "Inter", sans-serif';
+                ctx.fillStyle = getTermColor(m.ratio.num);
+                ctx.fillText(m.ratio.num, 0, -11);
+
+                // Fraction Divider Bar
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-34, 0);
+                ctx.lineTo(34, 0);
+                ctx.stroke();
+
+                // Denominator text
+                ctx.fillStyle = getTermColor(m.ratio.den);
+                ctx.fillText(m.ratio.den, 0, 12);
+
+                ctx.restore();
+            }
+
+            // Draw Explosion Particles
+            for (const p of particles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Draw Floating Score Texts
+            for (const ft of floatingTexts) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.font = '700 14px "Orbitron", sans-serif';
+                ctx.fillStyle = ft.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+
+            // Draw Sniper Turret at Bottom Center
+            drawTurret();
+        }
+
+        function getTermColor(term) {
+            if (term === 'Opposite') return '#fb7185';   // Rose
+            if (term === 'Adjacent') return '#34d399';   // Emerald
+            if (term === 'Hypotenuse') return '#fbbf24'; // Amber
+            return '#f8fafc';
+        }
+
+        function drawTurret() {
+            ctx.save();
+            ctx.translate(turret.x, turret.y);
+
+            // Turret Base Dome
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 10, 24, Math.PI, 0);
+            ctx.fill();
+            ctx.stroke();
+
+            // Rotating Laser Barrel
+            ctx.rotate(turret.angle + Math.PI / 2);
+            ctx.translate(0, turret.recoil);
+
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(-5, -26, 10, 24);
+            ctx.fillStyle = '#e0f2fe';
+            ctx.fillRect(-2, -28, 4, 24);
+
+            ctx.restore();
+        }
+
+        // 9. Game Lifecycle Controls (Start, Pause, Game Over)
+        function startGame() {
+            initAudio();
+            score = 0;
+            streak = 0;
+            bestStreak = 0;
+            lives = MAX_LIVES;
+            mistakeTracker = { sin: 0, cos: 0, tan: 0, csc: 0, sec: 0, cot: 0 };
+
+            meteors = [];
+            lasers = [];
+            particles = [];
+            floatingTexts = [];
+            spawnTimer = 0;
+            spawnInterval = 2800;
+
+            updateHUD();
+            resizeCanvas();
+
+            document.getElementById('start-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('cheat-modal').classList.add('hidden');
+
+            gameState = 'PLAYING';
+            lastTime = performance.now();
+            spawnMeteor(); // Spawn first meteor immediately
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            cancelAnimationFrame(animationFrameId);
+
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-streak').textContent = `${bestStreak}x`;
+
+            // Identify which ratio caused the most trouble to give a helpful tip
+            let worstRatioId = null;
+            let maxMistakes = 0;
+            for (const [key, count] of Object.entries(mistakeTracker)) {
+                if (count > maxMistakes) {
+                    maxMistakes = count;
+                    worstRatioId = key;
+                }
+            }
+
+            const tipEl = document.getElementById('study-tip-text');
+            if (worstRatioId && maxMistakes > 0) {
+                const r = TRIG_RATIOS.find(item => item.id === worstRatioId);
+                tipEl.innerHTML = `Focus on <b>${r.name} (${r.symbol})</b>: Remember it equals <span class="text-cyan-300 font-semibold">${r.num} / ${r.den}</span>.`;
+            } else {
+                tipEl.textContent = 'Clean shooting! Try pushing for a 15x streak on All 6 Ratios.';
+            }
+
+            document.getElementById('gameover-modal').classList.remove('hidden');
+        }
+
+        // 10. Event Listeners (Touch, Click, & Keyboard Support)
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            if (gameState !== 'PLAYING') draw();
+        });
+
+        // Mode Selection Buttons
+        document.querySelectorAll('.mode-select-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-select-btn').forEach(b => {
+                    b.classList.remove('border-2', 'border-cyan-500', 'bg-cyan-950/40');
+                    b.classList.add('border', 'border-slate-700', 'bg-slate-800/60');
+                });
+                btn.classList.remove('border', 'border-slate-700', 'bg-slate-800/60');
+                btn.classList.add('border-2', 'border-cyan-500', 'bg-cyan-950/40');
+                selectedMode = btn.dataset.mode;
+            });
+        });
+
+        document.getElementById('btn-start-game').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-change-mode').addEventListener('click', () => {
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('start-modal').classList.remove('hidden');
+            gameState = 'MENU';
+        });
+
+        // Cheat Sheet / Pause Modal
+        document.getElementById('btn-cheat-sheet').addEventListener('click', () => {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                cancelAnimationFrame(animationFrameId);
+            }
+            document.getElementById('cheat-modal').classList.remove('hidden');
+        });
+
+        function closeCheatSheet() {
+            document.getElementById('cheat-modal').classList.add('hidden');
+            if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                lastTime = performance.now();
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+        document.getElementById('btn-close-cheat').addEventListener('click', closeCheatSheet);
+        document.getElementById('btn-resume-cheat').addEventListener('click', closeCheatSheet);
+
+        // Sound Toggle
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', !soundEnabled);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', soundEnabled);
+        });
+
+        // 6 Ratio Firing Buttons (Touch & Click)
+        document.querySelectorAll('.trig-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const ratioId = btn.dataset.ratio;
+                handleFireRatio(ratioId);
+            });
+        });
+
+        // Optional Keyboard Shortcuts (Keys 1-6) if playing on desktop
+        window.addEventListener('keydown', (e) => {
+            const keyMap = { '1': 'sin', '2': 'cos', '3': 'tan', '4': 'csc', '5': 'sec', '6': 'cot' };
+            if (keyMap[e.key]) {
+                handleFireRatio(keyMap[e.key]);
+            }
+        });
+
+        // Initialize canvas on window load
+        window.onload = function () {
+            resizeCanvas();
+            updateHUD();
+            draw();
+        };
+    </script>
+</body>
+</html>
